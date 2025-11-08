@@ -1,7 +1,4 @@
-// Используем относительные пути благодаря proxy
-const API_BASE = process.env.NODE_ENV === 'production' 
-  ? 'https://repo-backend-kckq.onrender.com/api/auth'
-  : '/api/auth';
+const API_BASE = 'https://repo-backend-kckq.onrender.com/api/auth';
 
 export class AuthService {
   static async makeRequest(url, options) {
@@ -14,37 +11,35 @@ export class AuthService {
           'Content-Type': 'application/json',
           ...options.headers,
         },
+        mode: 'cors',
+        credentials: 'include', // Явно указываем режим CORS
       });
       
       console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
       
-      // Получаем текст ответа для анализа
       const responseText = await response.text();
       console.log('Response text:', responseText);
       
-      // Если ответ пустой, но статус успешный (200 или 201), считаем это успехом
       if ((response.status === 200 || response.status === 201) && (!responseText || responseText.trim() === '')) {
         console.log('Empty response with success status, returning success');
         return { success: true };
       }
       
-      // Пытаемся распарсить JSON
       let data;
       try {
         data = responseText ? JSON.parse(responseText) : {};
       } catch (parseError) {
         console.error('JSON parse error:', parseError);
-        // Если не JSON, но статус успешный, возвращаем текст
         if (response.ok || response.status === 201) {
           return { text: responseText, success: true };
         } else {
-          throw new Error(`Server returned non-JSON response: ${response.status} ${response.statusText}. Content: ${responseText.substring(0, 100)}`);
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
         }
       }
       
       console.log('Response data:', data);
       
-      // Считаем успешными статусы 200 и 201
       if (!response.ok && response.status !== 201) {
         const error = new Error(data.error || data.message || `HTTP error! status: ${response.status}`);
         error.data = data;
@@ -57,13 +52,14 @@ export class AuthService {
     } catch (error) {
       console.error('Request error details:', error);
       
-      if (error.name === 'TypeError') {
-        throw new Error('Не удалось подключиться к серверу. Проверьте, запущен ли бэкенд.');
+      if (error.name === 'TypeError' || error.message.includes('Failed to fetch')) {
+        throw new Error('CORS error: Не удалось подключиться к серверу. Проверьте настройки CORS на бэкенде.');
       }
       
       throw error;
     }
   }
+
 
   // ... остальные методы без изменений
   static async register(login) {
