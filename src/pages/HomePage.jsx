@@ -54,7 +54,83 @@ const HomePage = ({ user, onLogout, registrationData }) => {
     }
   };
 
-  // ... остальные функции без изменений (handleCreatePost, handleLike, handleAddComment, toggleComments, formatTime)
+  // Функция создания поста
+  const handleCreatePost = async (e) => {
+    e.preventDefault();
+    if (!newPostContent.trim()) return;
+
+    setLoading(true);
+    try {
+      const token = AuthService.getToken();
+      await AuthService.createPost(token, newPostContent);
+      setNewPostContent('');
+      await loadPosts(); // Перезагружаем посты
+    } catch (error) {
+      console.error('Error creating post:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Функция лайка поста
+  const handleLike = async (postId) => {
+    try {
+      const token = AuthService.getToken();
+      await AuthService.toggleLike(token, postId);
+      await loadPosts(); // Перезагружаем посты для обновления лайков
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    }
+  };
+
+  // Функция добавления комментария
+  const handleAddComment = async (postId) => {
+    const content = commentInputs[postId];
+    if (!content?.trim()) return;
+
+    try {
+      const token = AuthService.getToken();
+      await AuthService.addComment(token, postId, content);
+      
+      // Очищаем поле ввода комментария
+      setCommentInputs(prev => ({
+        ...prev,
+        [postId]: ''
+      }));
+      
+      await loadPosts(); // Перезагружаем посты для обновления комментариев
+    } catch (error) {
+      console.error('Error adding comment:', error);
+    }
+  };
+
+  // Функция переключения отображения комментариев
+  const toggleComments = (postId) => {
+    setExpandedComments(prev => ({
+      ...prev,
+      [postId]: !prev[postId]
+    }));
+  };
+
+  // Функция форматирования времени
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return 'только что';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes} мин. назад`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours} ч. назад`;
+    } else {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days} дн. назад`;
+    }
+  };
 
   if (postsLoading) {
     return (
