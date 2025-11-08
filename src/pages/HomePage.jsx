@@ -55,54 +55,87 @@ const HomePage = ({ user, onLogout, registrationData }) => {
   };
 
   // Функция создания поста
-  const handleCreatePost = async (e) => {
-    e.preventDefault();
-    if (!newPostContent.trim()) return;
+const handleCreatePost = async (e) => {
+  e.preventDefault();
+  if (!newPostContent.trim()) return;
 
-    setLoading(true);
-    try {
-      const token = AuthService.getToken();
-      await AuthService.createPost(token, newPostContent);
-      setNewPostContent('');
-      await loadPosts(); // Перезагружаем посты
-    } catch (error) {
-      console.error('Error creating post:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    const token = AuthService.getToken();
+    const newPost = await AuthService.createPost(token, newPostContent);
+    setNewPostContent('');
+    
+    // Локально добавляем новый пост в начало списка без перезагрузки
+    setPosts(prevPosts => [newPost, ...prevPosts]);
+  } catch (error) {
+    console.error('Error creating post:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
 
   // Функция лайка поста
-  const handleLike = async (postId) => {
-    try {
-      const token = AuthService.getToken();
-      await AuthService.toggleLike(token, postId);
-      await loadPosts(); // Перезагружаем посты для обновления лайков
-    } catch (error) {
-      console.error('Error toggling like:', error);
-    }
-  };
+const handleLike = async (postId) => {
+  try {
+    const token = AuthService.getToken();
+    const result = await AuthService.toggleLike(token, postId);
+    
+    // Локально обновляем состояние лайков без перезагрузки всех постов
+    setPosts(prevPosts => 
+      prevPosts.map(post => 
+        post.id === postId 
+          ? { 
+              ...post, 
+              is_liked: result.liked,
+              like_count: result.like_count 
+            }
+          : post
+      )
+    );
+  } catch (error) {
+    console.error('Error toggling like:', error);
+  }
+};
+
+
 
   // Функция добавления комментария
-  const handleAddComment = async (postId) => {
-    const content = commentInputs[postId];
-    if (!content?.trim()) return;
 
-    try {
-      const token = AuthService.getToken();
-      await AuthService.addComment(token, postId, content);
-      
-      // Очищаем поле ввода комментария
-      setCommentInputs(prev => ({
-        ...prev,
-        [postId]: ''
-      }));
-      
-      await loadPosts(); // Перезагружаем посты для обновления комментариев
-    } catch (error) {
-      console.error('Error adding comment:', error);
-    }
-  };
+const handleAddComment = async (postId) => {
+  const content = commentInputs[postId];
+  if (!content?.trim()) return;
+
+  try {
+    const token = AuthService.getToken();
+    const newComment = await AuthService.addComment(token, postId, content);
+    
+    // Очищаем поле ввода комментария
+    setCommentInputs(prev => ({
+      ...prev,
+      [postId]: ''
+    }));
+    
+    // Локально добавляем комментарий без перезагрузки всех постов
+    setPosts(prevPosts => 
+      prevPosts.map(post => 
+        post.id === postId 
+          ? { 
+              ...post, 
+              comments: [...(post.comments || []), newComment],
+              comments_count: (post.comments_count || 0) + 1
+            }
+          : post
+      )
+    );
+  } catch (error) {
+    console.error('Error adding comment:', error);
+  }
+};
+
+
 
   // Функция переключения отображения комментариев
   const toggleComments = (postId) => {
