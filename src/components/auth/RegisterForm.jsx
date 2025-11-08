@@ -22,20 +22,23 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
     setLoading(true);
     try {
       const result = await AuthService.register(login);
+      console.log('Register result:', result);
       
+      // Обрабатываем успешную регистрацию
       if (result.token) {
         AuthService.saveToken(result.token);
-        // Передаем данные для модалки
         onSuccess(result.user, result.generated_password);
       } else {
-        setError(result.error || 'Ошибка регистрации');
+        setError('Ошибка регистрации: неверный формат ответа от сервера');
       }
     } catch (err) {
-      // Показываем конкретное сообщение об ошибке от сервера
+      console.error('Register error:', err);
       if (err.message.includes('уже занят')) {
         setError(`Логин "${login}" уже занят. Пожалуйста, выберите другой логин.`);
       } else if (err.message.includes('Слишком много попыток')) {
         setError(err.message);
+      } else if (err.message.includes('Не удалось подключиться к серверу')) {
+        setError('Сервер не отвечает. Проверьте, запущен ли бэкенд на localhost:8000');
       } else {
         setError(err.message || 'Ошибка сети. Попробуйте позже.');
       }
@@ -56,7 +59,7 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <label htmlFor="login" className="block text-sm font-medium text-gray-700">
-              
+                Ваш логин
               </label>
               <div className="relative">
                 <input
@@ -65,7 +68,7 @@ const RegisterForm = ({ onSwitchToLogin, onSuccess }) => {
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
-                  placeholder="Придумайте себе логин"
+                  placeholder="Введите ваш логин"
                   required
                 />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">

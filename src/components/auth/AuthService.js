@@ -1,5 +1,7 @@
 // Используем относительные пути благодаря proxy
-const API_BASE = '/api/auth';
+const API_BASE = process.env.NODE_ENV === 'production' 
+  ? 'https://repo-backend-kckq.onrender.com/api/auth'
+  : '/api/auth';
 
 export class AuthService {
   static async makeRequest(url, options) {
@@ -15,43 +17,36 @@ export class AuthService {
       });
       
       console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
       
-      // Проверяем, есть ли контент
-      const contentLength = response.headers.get('content-length');
-      const contentType = response.headers.get('content-type');
+      // Получаем текст ответа для анализа
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
       
-      // Если ответ пустой (статус 200 но нет контента), возвращаем пустой объект
-      if (response.status === 200 && (!contentLength || contentLength === '0')) {
-        console.log('Empty response received, returning empty object');
-        return {};
+      // Если ответ пустой, но статус успешный (200 или 201), считаем это успехом
+      if ((response.status === 200 || response.status === 201) && (!responseText || responseText.trim() === '')) {
+        console.log('Empty response with success status, returning success');
+        return { success: true };
       }
       
-      // Если есть контент, но не JSON, обрабатываем как текст
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.log('Non-JSON response:', text.substring(0, 200));
-        
-        // Если текст пустой, возвращаем пустой объект
-        if (!text.trim()) {
-          return {};
-        }
-        
-        // Пытаемся распарсить как JSON, если не получается - возвращаем текст
-        try {
-          const data = JSON.parse(text);
-          return data;
-        } catch (e) {
-          return { text };
+      // Пытаемся распарсить JSON
+      let data;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        // Если не JSON, но статус успешный, возвращаем текст
+        if (response.ok || response.status === 201) {
+          return { text: responseText, success: true };
+        } else {
+          throw new Error(`Server returned non-JSON response: ${response.status} ${response.statusText}. Content: ${responseText.substring(0, 100)}`);
         }
       }
       
-      // Стандартная обработка JSON
-      const data = await response.json();
       console.log('Response data:', data);
       
-      if (!response.ok) {
-        const error = new Error(data.error || `HTTP error! status: ${response.status}`);
+      // Считаем успешными статусы 200 и 201
+      if (!response.ok && response.status !== 201) {
+        const error = new Error(data.error || data.message || `HTTP error! status: ${response.status}`);
         error.data = data;
         error.status = response.status;
         throw error;
