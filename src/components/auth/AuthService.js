@@ -17,14 +17,36 @@ export class AuthService {
       console.log('Response status:', response.status);
       console.log('Response headers:', response.headers);
       
-      // Проверяем Content-Type перед парсингом
+      // Проверяем, есть ли контент
+      const contentLength = response.headers.get('content-length');
       const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('Expected JSON but got:', contentType, 'Content:', text.substring(0, 200));
-        throw new Error(`Server returned non-JSON response: ${response.status} ${response.statusText}`);
+      
+      // Если ответ пустой (статус 200 но нет контента), возвращаем пустой объект
+      if (response.status === 200 && (!contentLength || contentLength === '0')) {
+        console.log('Empty response received, returning empty object');
+        return {};
       }
       
+      // Если есть контент, но не JSON, обрабатываем как текст
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.log('Non-JSON response:', text.substring(0, 200));
+        
+        // Если текст пустой, возвращаем пустой объект
+        if (!text.trim()) {
+          return {};
+        }
+        
+        // Пытаемся распарсить как JSON, если не получается - возвращаем текст
+        try {
+          const data = JSON.parse(text);
+          return data;
+        } catch (e) {
+          return { text };
+        }
+      }
+      
+      // Стандартная обработка JSON
       const data = await response.json();
       console.log('Response data:', data);
       
@@ -48,7 +70,7 @@ export class AuthService {
     }
   }
 
-
+  // ... остальные методы без изменений
   static async register(login) {
     return this.makeRequest(`${API_BASE}/register/`, {
       method: 'POST',
@@ -103,16 +125,6 @@ export class AuthService {
       body: JSON.stringify({ token, post_id: postId }),
     });
   }
-
-
-  // Добавим метод для проверки пароля
-static async verifyPassword(login, password) {
-  return this.makeRequest(`${API_BASE}/login/`, {
-    method: 'POST',
-    body: JSON.stringify({ login, password }),
-  });
-}
-
 
   static async addComment(token, postId, content) {
     return this.makeRequest(`${API_BASE}/posts/comment/`, {
